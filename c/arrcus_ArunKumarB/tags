@@ -1,0 +1,39 @@
+ARRCUS_TCAM_ERR	arrcus_tcam_debug.h	/^#define ARRCUS_TCAM_ERR(format, args...)    error_/
+ARRCUS_TCAM_TRC	arrcus_tcam_debug.h	/^#define ARRCUS_TCAM_TRC(format, args...)    trace_/
+DISPLAY	arrcus_tcam_test.h	/^#define DISPLAY(fmt, arg...)        printf(fmt"\\n/
+DISPLAY_ACK	arrcus_tcam_test.h	/^#define DISPLAY_ACK(fmt, arg...)    \\$/
+Marrcus_tcam_test	arrcus_tcam_test.c	/^main (int argc, char *argv[])$/
+READ	arrcus_tcam_test.h	/^#define READ(fmt, arg...)           scanf(fmt, ##a/
+arrcus_tcam_dt_tc_t	arrcus_tcam_test.h	/^} arrcus_tcam_dt_tc_t;$/
+arrcus_tcam_dynamic_test	arrcus_tcam_test.c	/^arrcus_tcam_dynamic_test ()$/
+arrcus_tcam_dynamic_test_handle	arrcus_tcam_test.c	/^arrcus_tcam_dynamic_test_handle (arrcus_tcam_dt_tc/
+arrcus_tcam_dynamic_test_menu	arrcus_tcam_test.c	/^arrcus_tcam_dynamic_test_menu ()$/
+arrcus_tcam_get_time	arrcus_tcam_debug.h	/^arrcus_tcam_get_time (void)$/
+arrcus_tcam_performance_test	arrcus_tcam_test.c	/^arrcus_tcam_performance_test()$/
+arrcus_tcam_static_test	arrcus_tcam_test.c	/^arrcus_tcam_static_test()$/
+entry_t	arrcus_tcam_defs.h	/^} entry_t;$/
+error_log	arrcus_tcam_debug.h	/^#define error_log(format, args...)                /
+logic	ReadMe.txt	/^   |v1.6 |  Spread logic (option) got added, for o/
+syserr_t	arrcus_tcam_debug.h	/^} syserr_t;$/
+tcam_access_flag_t	arrcus_tcam_defs.h	/^} tcam_access_flag_t;$/
+tcam_add_entries	arrcus_tcam_utils.c	/^tcam_add_entries (tcam_handle_t *tcam_handle_p, en/
+tcam_add_single_entry	arrcus_tcam_trc_logs	/^01\/26\/2022 15:31:22.306290 tcam_add_single_entry/
+tcam_entries_disp	arrcus_tcam_utils.c	/^tcam_entries_disp (void *tcam_hndl_p)$/
+tcam_get_optimal_position	arrcus_tcam_utils.c	/^tcam_get_optimal_position (tcam_handle_t *tcam_han/
+tcam_groom	arrcus_tcam_utils.c	/^tcam_groom (tcam_handle_t *tcam_handle_p)$/
+tcam_handle_disp	arrcus_tcam_utils.c	/^tcam_handle_disp (void *tcam_hndl_p)$/
+tcam_handle_release	arrcus_tcam_utils.c	/^tcam_handle_release (void **tcam_handle_pp)$/
+tcam_handle_t	arrcus_tcam_defs.h	/^} tcam_handle_t;$/
+tcam_hndl_flag_t	arrcus_tcam_defs.h	/^} tcam_hndl_flag_t;$/
+tcam_init	arrcus_tcam_entry_mgmt.c	/^tcam_init (entry_t *hw_tcam_p, uint32_t size, void/
+tcam_insert	arrcus_tcam_entry_mgmt.c	/^tcam_insert (void *tcam_hndl_p, entry_t *entries_p/
+tcam_pos_flag_t	arrcus_tcam_defs.h	/^} tcam_pos_flag_t;$/
+tcam_program	arrcus_tcam_utils.c	/^tcam_program (void *tcam_hndl_p, entry_t *entry_p,/
+tcam_remove	arrcus_tcam_entry_mgmt.c	/^tcam_remove (void *tcam_hndl_p, uint32_t id)$/
+tcam_shift_entries_down	arrcus_tcam_utils.c	/^tcam_shift_entries_down (tcam_handle_t *tcam_handl/
+tcam_shift_entries_up	arrcus_tcam_utils.c	/^tcam_shift_entries_up (tcam_handle_t *tcam_handle_/
+tcam_sort_entries	arrcus_tcam_utils.c	/^tcam_sort_entries (entry_t *entries_p, uint32_t nu/
+tcam_stats_disp	arrcus_tcam_utils.c	/^tcam_stats_disp (void *tcam_hndl_p)$/
+tcam_validate_entry_id	arrcus_tcam_utils.c	/^tcam_validate_entry_id (entry_t *entries_p, uint32/
+tcam_vld_entries_disp	arrcus_tcam_utils.c	/^tcam_vld_entries_disp (void *tcam_hndl_p)$/
+trace_log	arrcus_tcam_debug.h	/^#define trace_log(format, args...)                /

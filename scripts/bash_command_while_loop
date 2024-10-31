@@ -1,0 +1,473 @@
+#!/bin/bash
+
+VERSION="7/6/2023"
+
+SEND_CRAZY="Here’s to the crazy ones. The misfits. The rebels. The troublemakers. The round pegs in the square holes. The ones who see things differently. They’re not fond of rules. And they have no respect for the status quo. You can quote them, disagree with them, glorify or vilify them. About the only thing you can’t do is ignore them. Because they change things. They push the human race forward. And while some may see them as the crazy ones, we see genius. Because the people who are crazy enough to think they can change the world, are the ones who do."
+SEND_CRAZY_SIZE=556
+
+SEND_FOCUS="People think focus means saying yes to the thing you've got to focus on. But that's not what it means at all. It means saying no to the hundred other good ideas that there are. You have to pick carefully. I'm actually as proud of the things we haven't done as the things I have done. Innovation is saying no to 1,000 things."
+SEND_FOCUS_SIZE=325
+
+: ${PRIME_CACHE_FILE=/dev/shm/prime_cache_file.bin}
+: ${DAX=dax0.0}
+: ${DEV_DAX=/dev/$DAX}
+: ${CNT_SIZE=1}
+: ${CACHE_LINE_SIZE=64}
+: ${BLK_SIZE=128K}
+: ${seek_location=0}
+: ${LOOP_MAX=1}
+: ${SEEK_OFFSET=0}
+: ${hostname_size=0}
+: ${DEV_NULL=/dev/null}
+: ${PATTERN_INFILE=/dev/shm/${BLK_SIZE}_input_file.bin}
+: ${PATTERN_OUTFILE=/dev/shm/${BLK_SIZE}readback.bin}
+: ${PATTERN_TYPE=2}
+SANITY_LOG=sanity.log
+hostname_file=/dev/shm/hostname.bin
+
+RES_COL=40
+MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+SETCOLOR_FAILURE="echo -en \\033[1;31m"
+SETCOLOR_WARNING="echo -en \\033[1;33m"
+SETCOLOR_NORMAL="echo -en \\033[0;39m"
+SETCOLOR_BLUE="echo -en \\033[0;34m"
+SETCOLOR_CYAN="echo -en \\033[0;36m"
+
+die() {
+        [ ! -z "$1" ] && echo "$1"
+        exit 1
+}
+
+success() {
+        $MOVE_TO_COL; echo -n "["
+	$SETCOLOR_SUCCESS; echo -n $"  SANITY PASSED  $loop_count $(date "+%D %T") "  | tee $SANITY_LOG
+        $SETCOLOR_NORMAL; echo "]"
+}
+
+failed() {
+        $MOVE_TO_COL; echo -n "["
+        $SETCOLOR_FAILURE; echo -n $"SANITY FAILED" | tee $SANITY_LOG
+        $SETCOLOR_NORMAL; echo "]"
+        exit 1
+}
+
+# Parse K/k, M/m and G/g byte multipliers
+function covert_multiplier_to_size() {
+
+        supplied_multiplier=${1}
+
+        if [ $supplied_multiplier != "" ]; then
+                # Take the last character
+                multiplier=${supplied_multiplier: -1}
+                # Convert to lower case
+                multiplier=${multiplier,,}
+                # Strip off the last character
+                raw_number=${supplied_multiplier:: -1}
+                if [ "${multiplier,,}" == "k" ]; then
+                        echo $(($raw_number * 1024))
+                elif [ "${multiplier,,}" == "m" ]; then
+                        echo $(($raw_number * 1024 * 1024))
+                elif [ "${multiplier,,}" == "g" ]; then
+                        echo $(($raw_number * 1024 * 1024 * 1024))
+                else
+                        echo $supplied_multiplier
+                fi
+        fi
+}
+
+
+function compare_data () {
+
+        echo -e "Comparing"
+        SHA_IN=`sudo sha512sum $PATTERN_INFILE | awk '{print $1}'`
+        SHA_OUT=`sudo sha512sum $PATTERN_OUTFILE | awk '{print $1}'`
+        [ "$SHA_IN" = "$SHA_OUT" ] && success || failed
+        [ "$showmd" = "y" ] && echo -en "IN_SHA : $SHA_IN\nOUT_SHA: $SHA_OUT\n"
+
+}
+
+function read_data () {
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Reading data"
+        $SETCOLOR_NORMAL;
+        loop_count=0
+        CACHE_TRASH_SIZE=$(($BLOCK_COUNT * $LOOP_MAX))
+        echo ""
+        echo "Starting Cache Trash operation of $CACHE_TRASH_SIZE bytes"
+        echo ""
+        BLOCK_COUNT_HEX=$(printf "%x" $BLOCK_COUNT)
+        seek_location_hex=$(printf "%x" $seek_location)
+        echo -e "Reading data starting at address $seek_location (0x$seek_location_hex) of length $BLOCK_COUNT (0x$BLOCK_COUNT_HEX) from file location $seek_location"
+        for ((; $loop_count < $LOOP_MAX; seek_location=$seek_location + $BLOCK_COUNT))
+        do
+                BLOCK_COUNT_HEX=$(printf "%x" $BLOCK_COUNT)
+                seek_location_hex=$(printf "%x" $seek_location)
+                echo -e "Reading data length $BLOCK_COUNT (0x$BLOCK_COUNT_HEX) from CXL Memory location $seek_location (0x$seek_location_hex)"
+                sudo daxio --output=$PATTERN_OUTFILE --input=$DEV_DAX --seek=$seek_location --skip=$seek_location --len=$BLOCK_COUNT 2>$DEV_NULL
+                loop_count=$((loop_count+1))
+        done
+        echo ""
+        echo ""
+        echo "Cache Trash operation completed"
+        echo ""
+        echo ""
+        echo -e "Dumping first $SEND_SIZE bytes of data from CXL memory"
+        echo ""
+        $SETCOLOR_CYAN;
+        daxio --input=$DEV_DAX --len=$SEND_SIZE 2>/dev/null
+        $SETCOLOR_NORMAL;
+        echo ""
+        echo ""
+}
+
+function create_pattern_file () {
+        start_location=$seek_location
+        if [ $PATTERN_TYPE -eq 1 ] ; then
+                PATTERN_INFILE=/dev/shm/${BLK_SIZE}_deadbeaf_file.bin
+                while true ; do printf "DEADBEEF%08x" $start_location;start_location=$((start_location+1)); done | sudo dd of=${PATTERN_INFILE} bs=$BLK_SIZE count=$CNT_SIZE iflag=fullblock
+        fi
+        if [ $PATTERN_TYPE -eq 2 ] ; then
+                PATTERN_INFILE=/dev/shm/${BLK_SIZE}_cafebabe_file.bin
+                while true ; do printf "CAFEBABE%08x" $start_location;start_location=$((start_location+1)); done | sudo dd of=${PATTERN_INFILE} bs=$BLK_SIZE count=$CNT_SIZE iflag=fullblock
+        fi
+        if [ $PATTERN_TYPE -eq 3 ] ; then
+                PATTERN_INFILE=/dev/shm/${BLK_SIZE}_sendcrazy_file.bin
+                echo $SEND_CRAZY | sudo dd of=${PATTERN_INFILE} bs=1K count=1 iflag=fullblock
+                SEND_SIZE=$SEND_CRAZY_SIZE
+        fi
+        if [ $PATTERN_TYPE -eq 4 ] ; then
+                PATTERN_INFILE=/dev/shm/${BLK_SIZE}_sendfocus_file.bin
+                echo $SEND_FOCUS | sudo dd of=${PATTERN_INFILE} bs=1K count=1 iflag=fullblock
+                SEND_SIZE=$SEND_FOCUS_SIZE
+        fi
+}
+
+function create_pattern () {
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Generating pattern file of size $BLK_SIZE Bytes count $CNT_SIZE"
+        $SETCOLOR_NORMAL
+        loop_count=0000
+        create_pattern_file
+        prime_cache
+        # Add a message from this host
+        hostname=$(hostname)
+        send_host=$(echo "Message From CXL Host: $hostname ")
+        hostname_size=$(echo $send_host | wc -c)
+        echo $send_host > $hostname_file
+        hostname_size=$(echo $send_host | wc -c)
+        sudo daxio --input=${hostname_file} --output=$DEV_DAX --seek=$seek_location --skip=$seek_location --len=$hostname_size 2>/dev/null
+        write_data_pattern
+}
+
+function read_pattern () {
+        if [ $PATTERN_TYPE -eq 1 ] ; then
+                SEND_SIZE=64
+        fi
+        if [ $PATTERN_TYPE -eq 2 ] ; then
+                SEND_SIZE=64
+        fi
+        if [ $PATTERN_TYPE -eq 3 ] ; then
+                SEND_SIZE=$SEND_CRAZY_SIZE
+        fi
+        if [ $PATTERN_TYPE -eq 4 ] ; then
+                SEND_SIZE=$SEND_FOCUS_SIZE
+        fi
+
+        read_data $READ_BYTES
+}
+
+function write_data_pattern () {
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Writing data starting at address $seek_location in the card"
+        $SETCOLOR_NORMAL;
+        loop_count=0
+        seek_location=$(($seek_location + $hostname_size))
+
+        for (( ; $loop_count < $LOOP_MAX; seek_location = $seek_location + $BLOCK_COUNT))
+        do
+                echo -e "Writing data starting at address $seek_location of length $BLOCK_COUNT from file location $seek_location"
+                sudo daxio --input=$PATTERN_INFILE --output=$DEV_DAX --seek=$seek_location --skip=$seek_location --len=$BLOCK_COUNT 2>$DEV_NULL
+                loop_count=$((loop_count+1))
+        done
+}
+
+function write_data () {
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Writing data starting at address $seek_location in the card"
+        $SETCOLOR_NORMAL;
+        loop_count=0
+        seek_location=$(($seek_location + $hostname_size))
+
+        for (( ; $loop_count < $LOOP_MAX;))
+        do
+                BLOCK_COUNT_HEX=$(printf "%x" $BLOCK_COUNT)
+                seek_location_hex=$(printf "%x" $seek_location)
+                create_pattern_file
+                echo -e "Writing data starting at address $seek_location (0x$seek_location_hex) of length $BLOCK_COUNT (0x$BLOCK_COUNT_HEX) from file location $seek_location" | tee $SANITY_LOG
+                sudo daxio --input=$PATTERN_INFILE --output=$DEV_DAX --seek=$seek_location --len=$BLOCK_COUNT 2>$DEV_NULL
+                echo -e "Reading data length $BLOCK_COUNT (0x$BLOCK_COUNT_HEX) from CXL Memory location $seek_location (0x$seek_location_hex)"
+                sudo daxio --output=$PATTERN_OUTFILE --input=$DEV_DAX --skip=$seek_location --len=$BLOCK_COUNT 2>$DEV_NULL
+                compare_data
+                loop_count=$((loop_count+1))
+                if [ $SEEK_OFFSET -gt 0 ]; then
+                        # Jump up a requested amount
+                        seek_location=$(($seek_location + $SEEK_COUNT))
+                else
+                        # Jump up the size of the write
+                        seek_location=$(($seek_location + $BLOCK_COUNT))
+                fi
+        done
+}
+
+function prime_cache () {
+        $SETCOLOR_SUCCESS;
+        echo ""
+        echo -e "Priming cache by writing $CACHE_LINE_SIZE size"
+        $SETCOLOR_NORMAL;
+        echo -e "Generating random data of cache line size $CACHE_LINE_SIZE Bytes"
+        sudo dd if=/dev/random of=$PRIME_CACHE_FILE bs=1 count=$CACHE_LINE_SIZE
+        echo ""
+        sudo daxio --input=$PRIME_CACHE_FILE --output=$DEV_DAX 2>/dev/null
+        echo -e "Reading $CACHE_LINE_SIZE size"
+        sudo daxio --input=$DEV_DAX --output=$PATTERN_OUTFILE --len=$CACHE_LINE_SIZE
+        echo ""
+}
+
+function write_read () {
+        prime_cache
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Writing data starting at address zero"
+        $SETCOLOR_NORMAL;
+        sudo daxio --input=$PATTERN_INFILE --output=$DEV_DAX
+        echo -e "Reading data"
+        sudo daxio --input=$DEV_DAX --output=$PATTERN_OUTFILE --len=`stat -c%s $PATTERN_OUTFILE` 2>/dev/null
+        compare_data
+}
+
+function write_cache_lines () {
+        for (( mem_blocks = 0; mem_blocks < $LOOP_MAX; mem_blocks++ ))
+        do
+                echo -e "Starting Cache Line: $mem_blocks"
+                write_read
+        done
+        echo -e "Completed $mem_blocks of $LOOP_MAX Cache Lines"
+}
+
+function show_help () {
+
+        echo "-b = block size such as 128K, 1M.   K = 1024, M = 1024 * 1024"
+        echo "-c = cacheline size in bytes.  CXL cacheline size is 64 bytes"
+        echo "-i = specify a different read input file. Default = $PATTERN_INFILE"
+        echo "-o = specify a different write output file. Default = $PATTERN_OUTFILE"
+        echo "-l = loop count. Repeat block size/cacheline size loop count times."
+        echo "-r = read only."
+        echo "-p = choose pattern to read/write"
+        echo "-j = start at zero, then jump by specified size each time. (K/k, M/m or G/g bytes)"
+        echo "-s = skip to this address and start here.  (K/k, M/m or G/g bytes)"
+	echo ""
+        echo "Common examples:"
+        echo ""
+        echo "1.  Verify 1MB of memory starting at address 0."
+        echo "Write a 128 KB block size.  Read a 128 KB block size. Compare checksums."
+        echo "Seek 128KB block size. Repeat 8 times to cover 1 Megabytes of memory: "
+        echo "./sanity_check -b 128K -l 8"
+        echo ""
+        echo "2.  Running a test overnight."
+        echo "Run the test in the background with nohup to allow the closing of the login window."
+        echo "Run in the background with: &"
+        echo "nohup ./sanity_check -b 128K -l xxxx  &"
+        echo "Now close your window and go home."
+        echo "Next day check the last line in the sanity log file: $SANITY_LOG"
+        echo "Check progress at anytime with: tail -f $SANITY_LOG"
+        echo ""
+        echo "3.  Shared Memory Pooling."
+        echo "Write a few cachelines on sending Server."  
+        echo "Trash full 10MB cache on reading server to indirectly force a cache invalidate."
+        echo ""
+        echo "Pattern 1"
+        echo "Write side"
+        echo "./sanity_check -b 128K -l 1 -p 1"
+        echo "Read side 128K * 80 = 10MB"
+        echo "./sanity_check -r 128K -l 80 -p 1"
+        echo "Pattern 2"
+        echo "Write side is Intel"
+        echo "./sanity_check -b 128K -l 1 -p 2"
+        echo "Read side is AMD so skip to 2G to align with Intel on the write side"
+        echo "./sanity_check -r 128K -l 10 -p 2 -s 2G"
+}
+
+while [ "$#" -gt 0 ]; do
+        case "$1" in
+        -h | --help)
+                show_help
+                exit;;
+        -b | --blksize)
+                BLK="yes"
+                BLK_SIZE="$2"
+                shift;;
+        -c | --cachecount)
+                CACHE_LINE="yes"
+                CACHE_LINE_SIZE="$2"
+                shift;;
+        -i | --in)
+                PATTERN_INFILE="$2"
+                shift;;
+        -l | --loop)
+                LOOP_MAX="$2"
+                shift;;
+        -o | --out)
+                PATTERN_OUTFILE="$2"
+                shift;;
+        -r | --read)
+                READ_BYTES="$2"
+                shift;;
+        -p | --pattern)
+                PATTERN="yes"
+                PATTERN_TYPE="$2"
+                shift;;
+        -j | --jump)
+                SEEK="yes"
+                SEEK_OFFSET="$2"
+                shift;;
+        -s | --skip)
+                SKIP="yes"
+                SKIP_OFFSET="$2"
+                shift;;
+        -d | --dev | -dev)
+                USER_DAX="yes"
+                DAX="$2"
+		DEV_DAX=/dev/$DAX
+                shift;;
+        -S | --showmd)
+                showmd=y
+                ;;
+        esac
+        shift
+done
+
+is_pcie=` lspci | grep CXL`
+
+if [ "$is_pcie" == ""  ]; then
+        $SETCOLOR_FAILURE
+        echo "NO CXL CARD FOUND.  ABORTING."
+        failed
+        $SETCOLOR_NORMAL
+        exit
+else
+        $SETCOLOR_SUCCESS
+        echo "CXL Card Found:  $is_pcie"
+        echo ""
+        echo "Starting Sanity Test "
+        echo ""
+        echo "Version Date Code: $VERSION"
+        echo ""
+        $SETCOLOR_NORMAL
+fi
+
+# Remove previous runs
+[ -f "$PATTERN_OUTFILE" ] && sudo rm -f $PATTERN_OUTFILE
+[ -f "$PATTERN_INFILE" ] && sudo rm -f $PATTERN_INFILE
+[ -f "$SANITY_LOG" ] && sudo rm -f $SANITY_LOG
+
+
+echo -e "Installing cxl_pci"
+sudo modprobe cxl_pci
+echo -e "Installing cxl_mem"
+sudo modprobe cxl_mem
+echo -e "Installing cxl_acpi"
+sudo modprobe cxl_acpi
+
+echo -e "Installing cxl_pmem"
+sudo modprobe cxl_pmem
+
+echo -e "Installing cxl_port"
+sudo modprobe cxl_port
+
+echo -e "Installing dax_hmem"
+sudo modprobe dax_hmem
+
+echo -e "Installing device_dax"
+sudo modprobe device_dax
+echo ""
+echo -e "Enabling $DAX"
+echo ""
+sudo daxctl reconfigure-device --human --mode=devdax --force $DAX 2> /dev/shm/dax_error
+ERROR_MESSAGE=$(cat /dev/shm/dax_error)
+if [[ "$ERROR_MESSAGE" =~ "error" ]]; then
+        $SETCOLOR_FAILURE
+        echo DAX CONFIGURATION FAILURE: $ERROR_MESSAGE
+        $SETCOLOR_CYAN
+        echo ""
+	echo "Please contact your FAE for correct CXL 1.1 settings in your configuration file."
+        echo ""
+        $SETCOLOR_NORMAL
+        exit 1
+fi
+
+if [[ "$ERROR_MESSAGE" =~ "command not found" ]]; then
+        $SETCOLOR_FAILURE
+        echo DAX CONFIGURATION FAILURE: $ERROR_MESSAGE
+        $SETCOLOR_CYAN
+        echo ""
+        echo "Please ensure daxctl is installed."
+        echo ""
+        $SETCOLOR_NORMAL
+        exit 1
+fi
+
+
+# Parse K/k, M/m and G/g byte multipliers
+BLOCK_COUNT=$(covert_multiplier_to_size $BLK_SIZE)
+SEEK_COUNT=$(covert_multiplier_to_size $SEEK_OFFSET)
+
+if [ "$SKIP" == "yes" ]; then
+        start_location=$SKIP_OFFSET
+fi
+
+# Create bin file with hex pattern 0xdeadbeef
+if [ "$PATTERN" == "yes" ]; then
+
+        if [ "$READ_BYTES" != "" ]; then
+                read_pattern
+        else
+                create_pattern
+        fi
+        exit 0
+fi
+
+# for -r option reading only
+if [ "$READ_BYTES" != "" ]; then
+        read_data $READ_BYTES
+        exit 0
+fi
+
+# For -c option some size in bytes or the default case
+if [ "$BLK" != "yes" ]; then
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Generating random data of cache line size $CACHE_LINE_SIZE Bytes"
+        echo ""
+        $SETCOLOR_NORMAL
+        sudo dd if=/dev/random of=$PATTERN_INFILE bs=1 count=$CACHE_LINE_SIZE
+        write_cache_lines
+        exit 0
+fi
+
+# For -b option some size in K bytes or M bytes
+if [[ $CNT_SIZE != "" && $BLK_SIZE != "" ]]; then
+        echo ""
+        $SETCOLOR_SUCCESS;
+        echo -e "Writing and reading $CNT_SIZE block of $BLK_SIZE bytes"
+        echo ""
+        $SETCOLOR_NORMAL
+        write_data
+        exit 0
+fi
+
+

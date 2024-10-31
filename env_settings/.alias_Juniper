@@ -1,0 +1,612 @@
+bye ( )
+{
+    exit
+    exit
+}
+
+alias kicknet='/homes/arunkumarb/scripts/kicknet.exp'
+alias lognet='/homes/arunkumarb/scripts/lognet.exp'
+alias scp_auto='/homes/arunkumarb/scripts/scp_auto.exp'
+alias cwho='/homes/arunkumarb/scripts/cwho'
+alias TIE_traffic='/homes/arunkumarb/scripts/TIE_traffic.exp'
+alias build_container_login='/homes/arunkumarb/scripts/build_container_login.exp'
+
+access_device()
+{
+    ssh ttbg-shell008
+}
+
+access_code()
+{
+    ssh bnbaasshell4
+}
+
+build_container()
+{
+    ssh 10.47.19.178
+}
+
+show_servers()
+{
+    echo ""
+    echo "ttbg-shell0[01-15].juniper.net"
+    echo "ttsv-shell0[01-15].juniper.net"
+    echo "ttqc-shell0[01-15].juniper.net"
+    echo ""
+    echo "bnbaasshell[1-8].juniper.net"
+    echo ""
+    echo "bng-baas-evnc0[1-4].juniper.net"
+    echo "qnc-baas-evnc0[1-4].juniper.net"
+    echo ""
+}
+
+show_build_container()
+{
+    echo "Login to bnbaasshell4 first, then:"
+    echo "  ssh 10.47.19.178 (or)"
+    echo "  ssh 10.47.19.82"
+    echo ""
+    echo "Ref: https://s2c.juniper.net:8443/APMS/LoginSuccess.jsp"
+}
+
+baas_edit_ubuntu16()
+{
+    baas edit -s $1 -p yocto -m buildcontainer -l ubuntu16
+}
+
+baas_edit_ubuntu20()
+{
+    baas edit -s $1 -p yocto -m buildcontainer -l ubuntu20
+}
+
+baas_switch_to_ubuntu16()
+{
+    baas upgradepod -l ubuntu16 -s $1
+}
+
+baas_switch_to_ubuntu20()
+{
+    baas upgradepod -l ubuntu20 -s $1
+}
+
+show_kernel_version()
+{
+    lsb_release -r
+}
+
+build_kernel()
+{
+# Ref: https://evowiki.juniper.net/index.php/Juniper_'Out_Of_Tree_Modules'
+    cd /baas/arunkumarb/kernel/otm_test_master/master-yocto-sandbox/
+    . ./oe-init-build-env
+    eval `ssh-agent -s`
+    #ssh-add ~/.ssh/id_rsa
+    export PATH=/bin:/usr/bin:$PATH
+    export LANG=C.UTF-8
+    cpus=`egrep -c processor /proc/cpuinfo`
+    parallelism=$(($cpus * 2/3))
+    threads=$(($cpus * 2/3))
+    sed -i -e "s/BB_NUMBER_THREADS =.*/BB_NUMBER_THREADS = \"$threads\"/g" conf/local.conf
+    sed -i -e "s/PARALLEL_MAKE =.*/PARALLEL_MAKE = \"-j $parallelism\"/g" conf/local.conf
+    export DEPLOYBASE=/baas/arunkumarb/kernel/otm_test_master/kernel_publish_ArunKumarB/
+    cd ..
+    bash -x ~/bin/yoctoBuildKernels.sh
+}
+
+pull_evo_sb()
+{
+    sb create -n $1 -p evo -a -r HEAD
+    cd $1
+}
+
+pull_evo_sparse_sb()
+{
+    sb create -n $1 -p evo kernel jtd netjsr netkey lkm/tcp-ao lkm/mcgroup \
+                       rip-relay lkm/tcp-md5 hwd-gamora platform-utils \
+                       forwarding/evo-pfeman picd-gamora capdb-gamora \
+                       gamora-re-devdb gamora-fpc-devdb \
+                       vendor-sdk iepsctl jim yocto nm
+    cd $1
+}
+
+sb_add()
+{
+sb add kernel iepsctl jtd netjsr netkey lkm/tcp-ao lkm/mcgroup \
+           rip-relay lkm/tcp-md5 hwd-gamora platform-utils \
+           forwarding/evo-pfeman picd-gamora capdb-gamora \
+           gamora-re-devdb gamora-fpc-devdb \
+           vendor-sdk iepsctl jim yocto nm
+}
+
+pull_evo_sparse_sb_23_3()
+{
+    sb create -n $1 -p evo-rel-23.3
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 23.3 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_23_4()
+{
+    sb create -n $1 -p evo-rel-23.4
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 23.4 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_23_4_R1_S1()
+{
+    sb create -n $1 -p evo-rel-23.4R1-S1
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 23.4R1-S1 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_23_4_R1_S2()
+{
+    sb create -n $1 -p evo-rel-23.4R1-S2
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 23.4R1-S2 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_23_4_R2()
+{
+    sb create -n $1 -p evo-rel-23.4R2
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 23.4R2 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_24_1()
+{
+    sb create -n $1 -p evo-rel-24.1
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 24.1 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_24_2()
+{
+    sb create -n $1 -p evo-rel-24.2
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 24.2 sparse SB with required component\n"
+}
+
+pull_evo_sparse_sb_24_2_mfg_unified()
+{
+    sb create -n $1 -p evo-dev-mfg-242-unified
+    cd $1
+    sb_add
+    echo -e "Successfully pulled EVO 24.2 mfg-unified sparse SB with required component\n"
+}
+
+pull_kernel_sb_LTS19()
+{
+    git clone linuxgit:kernel/linux -b juniper/v5.2/standard/intel-x86
+}
+
+pull_yocto_sb_LTS19()
+{
+    export PATH=/bin:/usr/bin:$PATH
+    /volume/evo/files/share/buildtools/release-tools/bin/evo-yocto-sb-create master-yocto-sandbox-LTS19 -m wrl19-dev.xml
+}
+
+pull_kernel_sb_LTS22()
+{
+    git clone linuxgit:kernel/linux -b juniper/v5.15/standard/intel-x86
+}
+
+pull_yocto_sb_LTS22()
+{
+    export PATH=/bin:/usr/bin:$PATH
+    /volume/evo/files/share/buildtools/release-tools/bin/evo-yocto-sb-create master-yocto-sandbox-LTS22 -m wrl22-dev.xml
+}
+
+build_env_yocto()
+{
+    cd /b/workspace/otm_test_master/master-yocto-sandbox
+    export PATH=/bin:/usr/bin:$PATH
+    . ./oe-init-build-env
+    export LANG=C.UTF-8
+}
+
+build_gamora_img()
+{
+    baas build -b "sb make DEBUG=0 DEFAULT_COMPONENTS=acx-m-image UT_DISABLE=yes" -x
+}
+
+build_gamora_img_code_coverage()
+{
+    baas build -b "sb make COVERAGE=1 DEBUG=0 DEFAULT_COMPONENTS=acx-m-image UT_DISABLE=yes" -x
+}
+
+build_gamora_img_OFFICIAL()
+{
+    baas build -b "sb make DEFAULT_COMPONENTS=acx-m-image DEBUG=0 UT_DISABLE=1 IMA_SWITCH=1" -x
+}
+
+build_ptx1k_balerion_img()
+{
+    baas build -b "sb make DEFAULT_COMPONENTS=ptx1k-image DEBUG=0 UT_FAIL_IGNORE=1" -x
+}
+
+build_ultron_img()
+{
+    baas build -b "sb make DEBUG=0 DEFAULT_COMPONENTS=acx-f-image UT_DISABLE=yes" -x
+}
+
+build_quickly_gamora_img()
+{
+    cd ../meta-re64
+    sb make
+    cd ../image
+    sb make DEBUG=0 IMA_SWITCH=0
+}
+
+show_device_location()
+{
+    #echo "[Usage] wtfi ultron-plat-p2a-longevity-01 ultron-plat-p1d-longevity-02"
+    wtfi $1
+}
+
+show_gamora_usage()
+{
+    res sh gamora-plat-p1a-a,gamora-plat-p1a-b,gamora-plat-p1a-c,gamora-plat-p1a-d,gamora-plat-p1a-e,gamora-plat-p1a-f,gamora-plat-p1a-g,gamora-plat-p1a-h,gamora-plat-p1a-i,gamora-plat-p1a-j,gamora-plat-p1b-a,gamora-plat-p1b-b,gamora-plat-p1b-c,gamora-plat-p1b-d,gamora-plat-p1b-e,gamora-l-plat-p1a-a,gamora-l-plat-p1a-b,gamora-l-plat-p1a-c,gamora-l-plat-p1a-d,gamora-l-plat-p1b-a,gamora-l-plat-p1b-b,gamora-l-plat-p1b-c,gamora-l-plat-p1b-d,gamora-l-plat-p1b-e,gamora-l-plat-p1c-a,gamora-l-plat-p1c-b
+}
+
+show_acx_longevity_routers()
+{
+    echo "gamora-l-plat-p1a-d"
+    echo "ultron-plat-p2a-longevity-01"
+    echo "odin-plat-prod-longevity-01"
+    echo "xmen-plat-p1d-longevity-01"
+}
+
+show_topology()
+{
+# Displays the topology connection info with the neighbours n IXIA ports
+    params2-info $1
+}
+
+reserve_device()
+{
+    res co $1
+}
+
+release_device()
+{
+    res ci $1
+}
+
+transfer_device()
+{
+    res tr $1
+}
+
+power_off()
+{
+    lrm_power_cmd_v1 -r $1 -a off
+}
+
+power_on()
+{
+    lrm_power_cmd_v1 -r $1 -a on
+}
+
+power_cycle()
+{
+# Power cycle only if the router is reserved by you!
+    lrm_power_cmd -r $1 -a cycle 
+# Power cycle even if the router is not reserved by you :)
+    #/volume/baas-scratch/arunkumarb/bin/ltPwr -r $1
+}
+
+power_cycle_120s_delay()
+{
+    power_off $1
+    echo "Powered OFF and sleep 120 seconds"
+    sleep 120
+    power_on $1
+}
+
+green_build_list()
+{
+    /volume/buildtools/bin/getLGGRN --gcov -r DEV_COMMON_BRANCH
+}
+
+how_to_exec_tools_on_master_img()
+{
+    echo "sed -e 's/ima=1/ima=0/g'  -i /boot/grub/grub.cfg* /boot/EFI/BOOT/grub-startup.cfg* 2>/dev/null"
+    echo "sync"
+    echo "reboot"
+}
+
+coverity()
+{
+    /volume/buildtools/bin/run-coverity -D $1
+}
+
+configure_router_partially()
+{
+    rsu -r $1
+}
+
+configure_router()
+{
+    clean_config -r $1
+}
+
+jdebug_stack_trace()
+{
+    /volume/labtools/bin/jdebug
+}
+
+#show_pci_rescan
+#{
+#    echo "echo 1 > /sys/bus/pci/rescan"
+#}
+#
+#ubuntu_16_evo_sb_issue_fix()
+#{
+#    mv ~/.repoconfig ~/.repoconfig_old
+#}
+
+setup_ssh_passphrase()
+{
+    echo "To avoid entering passphrase multiple times during sb-upload"
+    echo "follow below steps:"
+    echo "eval  `/volume/buildtools/bin/ssh-agent.sh`"
+    echo "ssh-add ~/.ssh/id_rsa"
+    echo "ssh-add -l"
+}
+
+################################################################################
+#                 Make new entries above this :: JunIPer
+################################################################################
+
+build_copp_given()
+{
+cd /auto/wsabanusim-blr/$1/build/
+
+gmake x86/gdb/$2/sup
+gmake x86s/gdb/$2/sup
+gmake x86s/gdb/$2/supdc3x
+gmake p74xx/gdb/$2/sup
+gmake p8541/gdb/$2/sup
+
+}
+
+st_mini_ali_ACME_Project_quick ( )
+{
+    echo "Submitting to Minishan_quick_sanity  from Minishan Project..."
+    si -b minishan -t quick_sanity -baseline minishan \
+    -mboot /auto/andprojects/minishan/REL_6_2_0_MI_0_$1/build/images/gdb/m9100-s5ek9-kickstart-mzg.6.2.0.MI.0.$1.bin \
+    -misan /auto/andprojects/minishan/REL_6_2_0_MI_0_$1/build/images/gdb/m9100-s5ek9-mzg.6.2.0.MI.0.$1.bin \
+    -aboot /auto/andprojects/minishan/REL_6_2_0_MI_0_$1/build/images/gdb/m9250-s5ek9-kickstart-mzg.6.2.0.MI.0.$1.bin \
+    -aisan /auto/andprojects/minishan/REL_6_2_0_MI_0_$1/build/images/gdb/m9250-s5ek9-mzg.6.2.0.MI.0.$1.bin \
+    -subname Quick_Sanity_for_MI_0_$1_Minishan_Alishan_testbed -mail nxos-minishan-dev
+}
+
+srg_mds_cplink ( )
+{
+    echo "Selecting files with ZERO instances of supdc3. Eliminate upgrade files."
+    egrep -L 'swid.*dc3' *.srs | grep -v upgrade > mds_update.list
+
+    echo "Adding sup3dc3mds files into the list - mds_update.list"
+    egrep -l 'swid-sup3dc3mds' *.srs | grep -v upgrade >> mds_update.list
+
+    echo "Sorting file list in mds_update.list"
+    sort -u mds_update.list > temp
+    mv temp mds_update.list
+
+    echo "Copying required files, in case of Link Based Tree..."
+    cplink `cat mds_update.list `
+
+    echo "Ready for SRG changes"
+    echo "Step-1: sed -i -e 's/\"5.2(2E1)\", /\"5.2(2E1)\", \"5.2(2dE1)\", /g' \`cat mds_update.list\`"
+    echo ""
+    echo "Step-2: Update release date in srg/srg-timestamp.txt"
+    echo ""
+    echo "Step-3: ibuild -module srg,libsrg,srg_boot -bldtype final"
+    echo ""
+    echo "Step-4: ibuild -bldtype final -fullimage m9100_s2ek9_kickstart,m9100_s2ek9,m9100_s3ek9_kickstart,m9100_s3ek9,m9200_s2ek9_kickstart,m9200_s2ek9"
+    echo ""
+    echo ""
+}
+
+my_upgrade_image_isan ( )
+{
+    echo ""
+    echo "Building isan upgrade image:"
+    img_upgrade -i `pwd`/build/images/gdb/$1-*9-mzg.* \
+                -p `pwd`/ -o `pwd`/build/images/gdb/$1-isan.upg.bin -g -D
+    echo ""
+    echo "Isan upgrade image is ready!!!"
+    echo ""
+
+    echo "----------------------------------------------------------------"
+    echo "Syntax: /auto/andatc/linux/img-upgrade/1.1/bin/img_upgrade "
+    echo "        -i <kickstart/ isan image absolute path> "
+    echo "        -p <absolute path of workspace> "
+    echo "        -o <absolute path of upg.bin> -g -D"
+    echo ""
+    echo "NOTE: -g for GDB image only; -D for ADS machine only;"
+    echo "----------------------------------------------------------------"
+    echo ""
+    echo "Upgrade image:"
+    ls `pwd`/build/images/gdb/$1-isan.upg.bin
+}
+
+
+my_upgrade_image_kickstart ( )
+{
+    echo "Building kickstart upgrade image:"
+
+    cd build/images/gdb/
+    ibuild -upg $1-*9-kickstart-mzg.* -D
+    cp $1-*9-kickstart-mzg.*.upg $1-kick.upg.bin
+    cd ../../../
+
+    echo ""
+    echo "Kickstart upgrade image is ready!!!"
+    echo ""
+
+    echo "----------------------------------------------------------------"
+    echo "Syntax: ibuild -upg <kickstart/ isan image relative path> -D"
+    echo ""
+    echo "Syntax: /auto/andatc/linux/img-upgrade/1.1/bin/img_upgrade "
+    echo "        -i <kickstart/ isan image absolute path> "
+    echo "        -p <absolute path of workspace> "
+    echo "        -o <absolute path of upg.bin> -g -D"
+    echo ""
+    echo "NOTE: -g for GDB image only; -D for ADS machine only;"
+    echo "----------------------------------------------------------------"
+    echo ""
+    echo "Upgrade image:"
+    ls `pwd`/build/images/gdb/$1-kick.upg.bin
+}
+
+
+my_upgrade_image_both ( )
+{
+    my_upgrade_image_kickstart $1
+    my_upgrade_image_isan $1
+
+    echo "----------------------------------------------------------------"
+    echo ""
+    echo "Syntax: ibuild -upg <kickstart/ isan image relative path> -D"
+    echo ""
+    echo "----------------------------------------------------------------"
+    echo ""
+    echo "Upgrade images:"
+    ls `pwd`/build/images/gdb/$1-kick.upg.bin
+    ls `pwd`/build/images/gdb/$1-isan.upg.bin
+    echo ""
+
+}
+
+swims_ticket_nxos ( )
+{
+    echo "/auto/andatc/independent/acme_scripts/1.0/bin/generate-ticket.py"
+}
+
+ezcommit_commands ( )
+{
+    echo "export CCA_PROFILE=PILOT"
+    echo "export CCA_DIR=/auto/sw/packages/ezc-pkgs/pilot/cca/cca-client"
+
+    echo "/router/bin/cca-pilot execute -force -tasks sa -bugid CSCvc77622 [-more_bugids CSCvc82034]"
+    echo "/router/bin/cca-pilot clean"
+
+    echo "/router/bin/ezcommit-pilot submit -bugid <bug-id>"
+    echo "/router/bin/ezcommit-pilot status --target-branch skywalker -bugid <bug-id>"
+    echo "ezcommit clean"
+    echo "ezcommit-pilot abort"
+}
+
+acme_disable_copyright_check()
+{
+    export NXOS_ACME_TAGCOMMIT_DISABLE_COPYRIGHT=1
+    export ACME_DISABLE_COPYRIGHT=1
+}
+
+acme_fix_copyright_check()
+{
+    echo "To fix copyright issue, execute below command in root of workspace:"
+    echo " acme copyright_fix"
+    echo " "
+    echo "To know further details:"
+    echo " acme man copyright"
+}
+
+acme_permit_sjc_ws()
+{
+    export BYPASS_LOCAL_SITE_CHK=1
+}
+
+to_pull_sjc_based_lbt()
+{
+    export BYPASS_LOCAL_SITE_CHK=1
+}
+
+
+sb_upload()
+{
+    sb upload -s SKIP_CHECK -y SKIP_CHECK
+}
+
+double_commit_23_3()
+{
+    sb double-commit -c $1 -p evo-rel-23.3 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_23_4()
+{
+    sb double-commit -c $1 -p evo-rel-23.4 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_23_4R1()
+{
+    sb double-commit -c $1 -p evo-rel-23.4R1 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_23_4R2()
+{
+    sb double-commit -c $1 -p evo-rel-23.4R2 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_24_1()
+{
+    sb double-commit -c $1 -p evo-rel-24.1 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_24_1R1()
+{
+    sb double-commit -c $1 -p evo-rel-24.1R1 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_24_2()
+{
+    sb double-commit -c $1 -p evo-rel-24.2 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_24_2R1()
+{
+    sb double-commit -c $1 -p evo-rel-24.2R1 -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_24_2_unified()
+{
+    sb double-commit -c $1 -p evo-dev-mfg-242-unified -w /baas/arunkumarb/ieps/dc_dir/
+    :qa
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+double_commit_master()
+{
+    sb double-commit -c $1 -p evo -w /baas/arunkumarb/ieps/dc_dir/
+    # Ref: https://evowiki.juniper.net/index.php/SB_tools_reference#sb_double-commit
+}
+
+show_router_login_credentials()
+{
+    echo "root/ Embe1mpls"
+    echo "regress/ MaRtInI"
+}
+
+show_diff_generation_steps()
+{
+    echo "diff -Naru a/src/Makefile b/src/Makefile > diff"
+}
+
+
